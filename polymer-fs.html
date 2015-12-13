@@ -207,8 +207,10 @@ An element providing browser-side file access with a drop and drop interface
         rdr[self._outputMethods[self.output]](fl);
 
       }, function catchError(err){
-        console.log(err);
-        alert(err.message);
+        if (err){
+          console.log(err);
+          alert(err.message);
+        }
       });
     }
 
