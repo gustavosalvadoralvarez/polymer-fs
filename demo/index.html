@@ -20,13 +20,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 
 
-    <polymer-fs>
-    </polymer-fs>
+    <polymer-fs></polymer-fs>
 
     <script>
       document.querySelector('polymer-fs').addEventListener("file", function(evnt){
-        alert(JSON.stringify(result)); 
-      })
+        alert(JSON.stringify(evnt.detail.content));
+      });
     </script>
 
   </body>

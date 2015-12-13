@@ -4,6 +4,7 @@ Copyright (c) 2015 Gustavo Salvador Alvarez
 All Rights Reserved.
 -->
 <link rel="import" href="../polymer/polymer.html">
+<script src="../async/dist/async.min.js"></script>
 <!--
 An element providing browser-side file access with a drop and drop interface
 -->
@@ -34,12 +35,17 @@ An element providing browser-side file access with a drop and drop interface
     </style>
 
     <div class="drop-zone">Drop files here</div>
+
     <template is="dom-repeat" items="[[files]]">
-      <output class="file-output" id="[[item.name]]">
-
+      <output class="file-output"
+        id="[[item.name]]"
+        data-type="[[item.type]]"
+        data-error="[[item.error]]">
+        [[item.content]]
+      </output>
     </template>
-  </template>
 
+  </template>
 </dom-module>
 
 <script>
@@ -71,6 +77,13 @@ An element providing browser-side file access with a drop and drop interface
         notify: true
       },
 
+      reader: {
+        type: function(){ return {}; },
+        value: function(){
+          return new FileReader();
+        }
+      },
+
       callback: {
         type: function(){ return {}; },
         reflectToAttribute: true,
@@ -79,11 +92,12 @@ An element providing browser-side file access with a drop and drop interface
     },
 
     attached: function(){
-      var self, dropEl;
+      var self, dropEl; console.log("polymer-fs attached");
 
       self = this;
 
       dropEl = self.querySelector(".drop-zone");
+
       // HoF to generetate event listeners that preventDefault and stopPropagation
       function popEventBubble(fn){
         return function _popEventBubble(evnt){
@@ -93,29 +107,32 @@ An element providing browser-side file access with a drop and drop interface
         };
       }
 
-      var hadleFileDrop = popEventBubble(function fileDropHandler(evnt) {
+      var handleFileDrop = popEventBubble(function fileDropHandler(evnt) {
         var files;
-        files = evnt.dataTransfer.files; // FileList object.
-        if (files.length){
-          self._readFiles(files);
+        files = [].slice.call(evnt.dataTransfer.files);
+        if (files.length){ console.log("Files droped: ");console.log(files);
+          self._loadFiles(files);
         }
       });
 
-      var handleFileDragOver = popEventBubble(function dragOverHandler(envt){
-        evnt.dataTransfer.dropEffect = "copy";
+      var handleFileDragOver = popEventBubble(function dragOverHandler(evnt){
+        evnt.dataTransfer.dropEffect = "copy"; console.log("Files draged over drop-zone");
       });
 
       dropEl.addEventListener("dragover", handleFileDragOver);
       dropEl.addEventListener("drop", handleFileDrop);
+      console.log("polymer-fs drop-zone listeners set");
     },
 
     _loadFile: function(fl, cb){
-      var self;
+      var self, fn; console.log("Generating handler for:");console.log(fl);
 
       self = this;
 
-      return function _loadFile(evnt){
-        var target, result, fileObj;
+      fn = self.callback instanceof Function ? self.callback : null;
+
+      return function __loadFile(evnt){
+        var target, result, fileObj; console.log("Handling file event:");console.log(evnt);
 
         fileObj = {
           name: fl.name,
@@ -125,7 +142,7 @@ An element providing browser-side file access with a drop and drop interface
 
         target = evnt.target;
 
-        if (target.error){
+        if (target.error){ console.log("File reader error: ");console.log(target.error);
 
           switch(evt.target.error.code) {
             case evt.target.error.NOT_FOUND_ERR:
@@ -139,25 +156,25 @@ An element providing browser-side file access with a drop and drop interface
             break;
             default:
               fileObj.error = "Unknown Error";
-         }
+          }
 
           self.fire('error', flObj);
           cb(target.error);
         }
-        else if (target.readyState === 2){
-          fileObj.content = evnt.result;
+        else if (target.readyState === 2){ console.log("File reader success");
+          fileObj.content = target.result;
           fileObj.error = "";
-          self.fire('file', flObj);
+          self.fire('file', fileObj);
           cb(null);
         }
-        else {
+        else { console.log("File reader failiur: ");console.log(target.readyState);
           fileObj.error = target.readyState;
+          self.fire('error', flObj);
           cb(new Error ("Received readyState: "+String(target.readyState)));
         }
 
-
-        if (self.callback instanceof Function){
-          self.callback(flObj);
+        if (fn){
+          fn(flObj);
         }
 
         self.files.push(flObj);
@@ -165,188 +182,33 @@ An element providing browser-side file access with a drop and drop interface
     },
 
     _loadFiles: function(files){
-      var self, selFile, mthd;
+      var self, selFile, rdr, readFl; console.log("Reading files: ");console.log(files);
 
       self = this;
 
       loadFile = self._loadFile;
 
-      mthd = self._outputMethods[self.output];
+      rdr = self.reader;
+
+      console.log(self._outputMethods[self.output]);
+      console.log(rdr[self._outputMethods[self.output]]);
+
+      readFl = rdr[self._outputMethods[self.output]];
 
       async.eachSeries(files, function etl(fl, callback){
-        var rdr, handler;
+        var handler;
 
-        rdr = new FileReader();
-
-        handler = loadFile(fl, callback);
+        handler = loadFile.call(self, fl, callback);
 
         rdr.onloadend = handler;
 
         rdr.onerror = handler;
 
-        rdr[mthd](fl);
-
-
-      })
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-    callbackHandler: function handleWith(fn){
-      var self;
-
-      self = this;
-
-      return function wrappedCallback(fl, cb){
-        return function _wrapperCallback(evnt){
-          var target, err, readyState res, fileObj, setFiles;
-
-          target = evnt.target;
-
-          err = target.error;
-
-          if (err){
-            fn(err.message);
-            cb(err);
-          }
-
-          readyState = target.readyState;
-
-
-
-        }
-        var fileObj, setFiles;
-
-        fileObj = {
-          name: fl.name,
-          type: fl.type,
-          size: fl.size,
-          content:
-
-
-          (err instanceof Error ? err.message
-          : res ? res
-          : err)
-        };
-
-        setFiles = self.files.concat(fileObj);
-
-        self.set("files", setFiles);
-
-        if (err){
-          fn(fileObj);
-        }
-        else {
-          fn(null, fileObj);
-        }
-
-        return cb(null);
-      };
-    },
-
-    _callback: function(){
-      var self, setCb;
-
-      self = this;
-
-      setCb = self.callback;
-
-      wrpr = self.callbackWrapper;
-
-      return setCb && setCb instanceof Function ? wror(setCb) : wrpr(
-        function eventCallback(err, file){
-          if (err){
-            self.fire('error', err);
-            return;
-          }
-          self.fire('file', file);
-        }
-      );
-    },
-
-    _readFiles: function(files){
-      var self, fileCallback;
-
-      self = this;
-
-      fileCallback = self._callback();
-
-      async.eachSeries(files, function(fl, callback){
-        var rdr, _fileCallback;
-
-        rdr = new FileReader():
-
-
-
-
-      })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      var self, fileCallback, wrapper, setCallback;
-
-      self = this;
-
-      setCallback = self.callback;
-
-      wrapper = self.callbackWrapper;
-
-      fileCallback = setCallback ? wrapper(setCallback)
-        : wrapper(function eventCallback(err, file){
-          if (err){
-            self.fire('error', err);
-            return;
-          }
-          self.fire('file', file);
-      });
-
-      async.eachSeries(
-        files,
-
-        function parseFile(v, callback){
-        var rdr;
-
-        rdr = new FileReader();
-
-        rdr.onLoadEnded = function onLoadEndedHandler(evnt){
-          var target, result;
-
-          target = evnt.target;
-
-          if (target.readyState === 2){ // reader suceeded
-            return fileCallback(null, target.results, v);
-          }
-
-        };
-
-        rdr[self._outputMethods[self.output]](v);
+        rdr[self._outputMethods[self.output]](fl);
+
+      }, function catchError(err){
+        console.log(err);
+        alert(err.message);
       });
     }
 
