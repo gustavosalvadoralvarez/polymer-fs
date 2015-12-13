@@ -74,6 +74,7 @@ An element providing browser-side file access with a drop and drop interface
 
       files: {
         type: function(){ return []; },
+        value: function(){ return []; },
         notify: true
       },
 
@@ -132,7 +133,7 @@ An element providing browser-side file access with a drop and drop interface
       fn = self.callback instanceof Function ? self.callback : null;
 
       return function __loadFile(evnt){
-        var target, result, fileObj; console.log("Handling file event:");console.log(evnt);
+        var target, result, fileObj, setFiles; console.log("Handling file event:");console.log(evnt);
 
         fileObj = {
           name: fl.name,
@@ -161,13 +162,17 @@ An element providing browser-side file access with a drop and drop interface
           self.fire('error', flObj);
           cb(target.error);
         }
+
         else if (target.readyState === 2){ console.log("File reader success");
+
           fileObj.content = target.result;
           fileObj.error = "";
           self.fire('file', fileObj);
           cb(null);
         }
+
         else { console.log("File reader failiur: ");console.log(target.readyState);
+
           fileObj.error = target.readyState;
           self.fire('error', flObj);
           cb(new Error ("Received readyState: "+String(target.readyState)));
@@ -177,7 +182,8 @@ An element providing browser-side file access with a drop and drop interface
           fn(flObj);
         }
 
-        self.files.push(flObj);
+        setFiles = self.files.concat(fileObj);
+        self.set("files", setFiles);
       };
     },
 

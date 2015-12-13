@@ -1,18 +1,19 @@
 {
   "name": "polymer-fs",
-  "version": "1.0.3",
+  "version": "0.1.1",
   "authors": [
-    "Anonymous <anonymous@example.com>"
+    "GSA"
   ],
-  "description": "An element providing a solution to no problem in particular.",
+  "description": "client-device to browser file upload polymer element",
   "keywords": [
     "web-component",
     "polymer",
-    "seed"
+    "seed",
+    "File API"
   ],
   "main": "polymer-fs.html",
-  "license": "http://polymer.github.io/LICENSE.txt",
-  "homepage": "https://github.com/<USERNAME>/seed-element/",
+  "license": "MIT",
+  "homepage": "",
   "ignore": [
     "/.*",
     "/test/"
