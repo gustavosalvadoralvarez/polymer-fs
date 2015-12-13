@@ -1,0 +1,355 @@
+<!--
+@license
+Copyright (c) 2015 Gustavo Salvador Alvarez
+All Rights Reserved.
+-->
+<link rel="import" href="../polymer/polymer.html">
+<!--
+An element providing browser-side file access with a drop and drop interface
+-->
+<dom-module id="polymer-fs">
+
+  <template>
+    <style>
+      :host {
+        display: block;
+        box-sizing: border-box;
+      }
+
+      :host .drop-zone {
+        border: 2px dashed #bbb;
+        -moz-border-radius: 5px;
+        -webkit-border-radius: 5px;
+        border-radius: 5px;
+        padding: 25px;
+        text-align: center;
+        font: 20pt bold 'Vollkorn';
+        color: #bbb;
+      }
+
+      :host .file-output {
+        display: none;
+      }
+
+    </style>
+
+    <div class="drop-zone">Drop files here</div>
+    <template is="dom-repeat" items="[[files]]">
+      <output class="file-output" id="[[item.name]]">
+
+    </template>
+  </template>
+
+</dom-module>
+
+<script>
+
+  Polymer({
+
+    is: 'polymer-fs',
+
+    properties: {
+
+      output: {
+        type: String,
+        reflectToAttribute: true,
+        value: "text"
+      },
+
+      _outputMethods: {
+        readOnly: true,
+        type: function() { return {}; },
+        value: {
+          "text": "readAsText",
+          "binary": "readAsBinaryString",
+          "url": "readAsDataURL"
+        }
+      },
+
+      files: {
+        type: function(){ return []; },
+        notify: true
+      },
+
+      callback: {
+        type: function(){ return {}; },
+        reflectToAttribute: true,
+        notify: true
+      }
+    },
+
+    attached: function(){
+      var self, dropEl;
+
+      self = this;
+
+      dropEl = self.querySelector(".drop-zone");
+      // HoF to generetate event listeners that preventDefault and stopPropagation
+      function popEventBubble(fn){
+        return function _popEventBubble(evnt){
+          evnt.stopPropagation();
+          evnt.preventDefault();
+          fn(evnt);
+        };
+      }
+
+      var hadleFileDrop = popEventBubble(function fileDropHandler(evnt) {
+        var files;
+        files = evnt.dataTransfer.files; // FileList object.
+        if (files.length){
+          self._readFiles(files);
+        }
+      });
+
+      var handleFileDragOver = popEventBubble(function dragOverHandler(envt){
+        evnt.dataTransfer.dropEffect = "copy";
+      });
+
+      dropEl.addEventListener("dragover", handleFileDragOver);
+      dropEl.addEventListener("drop", handleFileDrop);
+    },
+
+    _loadFile: function(fl, cb){
+      var self;
+
+      self = this;
+
+      return function _loadFile(evnt){
+        var target, result, fileObj;
+
+        fileObj = {
+          name: fl.name,
+          type: fl.type,
+          size: fl.size
+        };
+
+        target = evnt.target;
+
+        if (target.error){
+
+          switch(evt.target.error.code) {
+            case evt.target.error.NOT_FOUND_ERR:
+              fileObj.error = 'File Not Found';
+            break;
+            case evt.target.error.NOT_READABLE_ERR:
+              fileObj.error = 'File is not readable';
+            break;
+            case evt.target.error.ABORT_ERR:
+              fileObl.error = 'File read aborted';
+            break;
+            default:
+              fileObj.error = "Unknown Error";
+         }
+
+          self.fire('error', flObj);
+          cb(target.error);
+        }
+        else if (target.readyState === 2){
+          fileObj.content = evnt.result;
+          fileObj.error = "";
+          self.fire('file', flObj);
+          cb(null);
+        }
+        else {
+          fileObj.error = target.readyState;
+          cb(new Error ("Received readyState: "+String(target.readyState)));
+        }
+
+
+        if (self.callback instanceof Function){
+          self.callback(flObj);
+        }
+
+        self.files.push(flObj);
+      };
+    },
+
+    _loadFiles: function(files){
+      var self, selFile, mthd;
+
+      self = this;
+
+      loadFile = self._loadFile;
+
+      mthd = self._outputMethods[self.output];
+
+      async.eachSeries(files, function etl(fl, callback){
+        var rdr, handler;
+
+        rdr = new FileReader();
+
+        handler = loadFile(fl, callback);
+
+        rdr.onloadend = handler;
+
+        rdr.onerror = handler;
+
+        rdr[mthd](fl);
+
+
+      })
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+    callbackHandler: function handleWith(fn){
+      var self;
+
+      self = this;
+
+      return function wrappedCallback(fl, cb){
+        return function _wrapperCallback(evnt){
+          var target, err, readyState res, fileObj, setFiles;
+
+          target = evnt.target;
+
+          err = target.error;
+
+          if (err){
+            fn(err.message);
+            cb(err);
+          }
+
+          readyState = target.readyState;
+
+
+
+        }
+        var fileObj, setFiles;
+
+        fileObj = {
+          name: fl.name,
+          type: fl.type,
+          size: fl.size,
+          content:
+
+
+          (err instanceof Error ? err.message
+          : res ? res
+          : err)
+        };
+
+        setFiles = self.files.concat(fileObj);
+
+        self.set("files", setFiles);
+
+        if (err){
+          fn(fileObj);
+        }
+        else {
+          fn(null, fileObj);
+        }
+
+        return cb(null);
+      };
+    },
+
+    _callback: function(){
+      var self, setCb;
+
+      self = this;
+
+      setCb = self.callback;
+
+      wrpr = self.callbackWrapper;
+
+      return setCb && setCb instanceof Function ? wror(setCb) : wrpr(
+        function eventCallback(err, file){
+          if (err){
+            self.fire('error', err);
+            return;
+          }
+          self.fire('file', file);
+        }
+      );
+    },
+
+    _readFiles: function(files){
+      var self, fileCallback;
+
+      self = this;
+
+      fileCallback = self._callback();
+
+      async.eachSeries(files, function(fl, callback){
+        var rdr, _fileCallback;
+
+        rdr = new FileReader():
+
+
+
+
+      })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      var self, fileCallback, wrapper, setCallback;
+
+      self = this;
+
+      setCallback = self.callback;
+
+      wrapper = self.callbackWrapper;
+
+      fileCallback = setCallback ? wrapper(setCallback)
+        : wrapper(function eventCallback(err, file){
+          if (err){
+            self.fire('error', err);
+            return;
+          }
+          self.fire('file', file);
+      });
+
+      async.eachSeries(
+        files,
+
+        function parseFile(v, callback){
+        var rdr;
+
+        rdr = new FileReader();
+
+        rdr.onLoadEnded = function onLoadEndedHandler(evnt){
+          var target, result;
+
+          target = evnt.target;
+
+          if (target.readyState === 2){ // reader suceeded
+            return fileCallback(null, target.results, v);
+          }
+
+        };
+
+        rdr[self._outputMethods[self.output]](v);
+      });
+    }
+
+  });
+
+</script>
